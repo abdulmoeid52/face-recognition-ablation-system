@@ -1,0 +1,12 @@
+api/
+src/
+scripts/
+data/
+models/
+notebooks/
+results/
+report/
+requirements.txt
+config.yaml
+.env.example
+main.py
