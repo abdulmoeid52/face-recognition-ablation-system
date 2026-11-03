@@ -1,3 +1,14 @@
+---
+title: Face Recognition Ablation
+emoji: 🧠
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
+
 # Face Recognition Ablation Study
 
 > Which part of a face does a face-recognition model actually use?
@@ -19,3 +30,5 @@
 (From `notebooks/01_ablation_blur.ipynb`, N identities on LFW.)
 
 ## Pipeline
+
+
