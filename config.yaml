@@ -1,0 +1,9 @@
+model_name: ArcFace
+detector_backend: opencv
+threshold: 0.40          # ← replace with output of scripts/tune_threshold.py
+max_upload_mb: 8
+
+# relative to project root — resolved by src/config.py
+dlib_model_path: models/shape_predictor_68_face_landmarks.dat
+gallery_path: data/gallery
+gallery_store: data/gallery_embeddings.npz

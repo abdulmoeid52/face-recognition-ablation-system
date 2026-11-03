@@ -1,0 +1,36 @@
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# models & data (too large)
+models/*.dat
+models/*.h5
+*.pkl
+data/lfw-funneled/
+data/gallery/
+data/*.npz
+!data/.gitkeep
+!data/gallery/.gitkeep
+
+# node
+web/node_modules/
+web/.next/
+web/out/
+web/.env.local
+
+# os / editors
+.DS_Store
+.vscode/
+.idea/
+
+# kaggle leftovers
+.kaggle/
+/kaggle/
+
+# temp
+tmp_*.jpg
+results/tmp_*.jpg
