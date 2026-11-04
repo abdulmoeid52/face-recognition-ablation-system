@@ -34,3 +34,5 @@ web/.env.local
 # temp
 tmp_*.jpg
 results/tmp_*.jpg
+.vercel
+.env*

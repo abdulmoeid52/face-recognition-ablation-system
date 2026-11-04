@@ -1,244 +1,10 @@
-// "use client";
-// import { useEffect, useRef, useState } from "react";
-//
-// const API = process.env.NEXT_PUBLIC_API_URL || "";
-//
-// type VerifyResult = {
-//   match: string | null;
-//   best_candidate?: string;
-//   score: number;
-//   threshold: number;
-//   all?: Record<string, number>;
-//   message?: string;
-// };
-//
-// export default function LiveVerify() {
-//   const videoRef = useRef<HTMLVideoElement>(null);
-//   const canvasRef = useRef<HTMLCanvasElement>(null);
-//   const streamRef = useRef<MediaStream | null>(null);
-//   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-//   const inFlightRef = useRef(false);
-//
-//   const [active, setActive] = useState(false);
-//   const [warming, setWarming] = useState(false);
-//   const [result, setResult] = useState<VerifyResult | null>(null);
-//   const [lastUpdate, setLastUpdate] = useState<number>(0);
-//   const [error, setError] = useState<string | null>(null);
-//
-//   // enroll-related
-//   const [enrollName, setEnrollName] = useState("");
-//   const [enrolling, setEnrolling] = useState(false);
-//   const [enrollMsg, setEnrollMsg] = useState<string | null>(null);
-//   const [lastCapture, setLastCapture] = useState<string | null>(null);
-//
-//   async function start() {
-//     setError(null);
-//     setResult(null);
-//     setEnrollMsg(null);
-//
-//     try {
-//       const stream = await navigator.mediaDevices.getUserMedia({
-//         video: { width: 640, height: 480, facingMode: "user" },
-//         audio: false,
-//       });
-//       streamRef.current = stream;
-//       if (videoRef.current) {
-//         videoRef.current.srcObject = stream;
-//         await videoRef.current.play();
-//       }
-//       setActive(true);
-//     } catch (e: any) {
-//       setError(
-//         e?.name === "NotAllowedError"
-//           ? "Camera permission denied. Allow camera access and try again."
-//           : "Camera error: " + (e?.message || e)
-//       );
-//       return;
-//     }
-//
-//     setWarming(true);
-//     try {
-//       await fetch(`${API}/health`);
-//     } catch {
-//       /* ignore */
-//     }
-//     setWarming(false);
-//
-//     intervalRef.current = setInterval(captureAndVerify, 1200);
-//   }
-//
-//   function stop() {
-//     if (intervalRef.current) {
-//       clearInterval(intervalRef.current);
-//       intervalRef.current = null;
-//     }
-//     if (streamRef.current) {
-//       streamRef.current.getTracks().forEach((t) => t.stop());
-//       streamRef.current = null;
-//     }
-//     if (videoRef.current) videoRef.current.srcObject = null;
-//     setActive(false);
-//     setResult(null);
-//     setWarming(false);
-//     setLastCapture(null);
-//     setEnrollMsg(null);
-//   }
-//
-//   function grabFrameBlob(): Promise<Blob | null> {
-//     return new Promise((resolve) => {
-//       const video = videoRef.current;
-//       const canvas = canvasRef.current;
-//       if (!video || !canvas || video.videoWidth === 0) return resolve(null);
-//       canvas.width = video.videoWidth;
-//       canvas.height = video.videoHeight;
-//       const ctx = canvas.getContext("2d");
-//       if (!ctx) return resolve(null);
-//       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-//       canvas.toBlob((b) => resolve(b), "image/jpeg", 0.85);
-//     });
-//   }
-//
-//   async function captureAndVerify() {
-//     if (inFlightRef.current) return;
-//     inFlightRef.current = true;
-//     try {
-//       const blob = await grabFrameBlob();
-//       if (!blob) return;
-//       const fd = new FormData();
-//       fd.append("file", blob, "frame.jpg");
-//
-//       const r = await fetch(`${API}/verify`, { method: "POST", body: fd });
-//       if (r.status === 422) {
-//         setResult(null);
-//         setLastUpdate(Date.now());
-//         return;
-//       }
-//       if (!r.ok) return;
-//       const data: VerifyResult = await r.json();
-//       setResult(data);
-//       setLastUpdate(Date.now());
-//     } catch {
-//       /* skip frame */
-//     } finally {
-//       inFlightRef.current = false;
-//     }
-//   }
-//
-//   async function captureAndEnroll() {
-//     const name = enrollName.trim();
-//     if (!name) return;
-//     setEnrolling(true);
-//     setEnrollMsg(null);
-//     try {
-//       const blob = await grabFrameBlob();
-//       if (!blob) throw new Error("No frame available");
-//
-//       // show what we captured
-//       const canvas = canvasRef.current!;
-//       setLastCapture(canvas.toDataURL("image/jpeg", 0.7));
-//       setTimeout(() => setLastCapture(null), 3500);
-//
-//       const fd = new FormData();
-//       fd.append("file", blob, "capture.jpg");
-//       fd.append("name", name);
-//
-//       const r = await fetch(`${API}/enroll`, { method: "POST", body: fd });
-//       const data = await r.json();
-//       if (!r.ok) throw new Error(data.detail || "Enroll failed");
-//
-//       setEnrollMsg(`✓ Enrolled "${data.enrolled}" from live frame`);
-//       // trigger an immediate re-verify so the badge updates without waiting
-//       await captureAndVerify();
-//     } catch (e: any) {
-//       setEnrollMsg("✗ " + (e.message || "Enroll failed"));
-//     } finally {
-//       setEnrolling(false);
-//     }
-//   }
-//
-//   useEffect(() => {
-//     return () => stop();
-//     // eslint-disable-next-line react-hooks/exhaustive-deps
-//   }, []);
-//
-//   const matched = !!result?.match;
-//   const fresh = Date.now() - lastUpdate < 2500;
-//
-//   return (
-//     <div className="live-wrap">
-//       <div className={`live-frame ${matched ? "ok" : result ? "fail" : ""}`}>
-//         <video ref={videoRef} className="live-video" playsInline muted />
-//         <canvas ref={canvasRef} style={{ display: "none" }} />
-//
-//         {active && result && fresh && (
-//           <div className={`live-badge ${matched ? "ok" : "fail"}`}>
-//             <span>{matched ? "✓ " + result.match : "✗ " + (result.best_candidate || "unknown")}</span>
-//             <span className="score">{result.score.toFixed(3)}</span>
-//           </div>
-//         )}
-//         {active && !result && <div className="live-badge idle">Searching for face…</div>}
-//         {warming && <div className="live-badge warm">Warming up backend…</div>}
-//         {!active && <div className="live-placeholder">Camera is off</div>}
-//       </div>
-//
-//       <div className="live-controls">
-//         {!active ? (
-//           <button className="btn" onClick={start}>▶ Start camera</button>
-//         ) : (
-//           <button className="btn btn-danger" onClick={stop}>■ Stop</button>
-//         )}
-//       </div>
-//
-//       {active && (
-//         <>
-//           <div className="live-enroll-row">
-//             <input
-//               className="field"
-//               style={{ marginBottom: 0 }}
-//               placeholder="Name to enroll (e.g. alice)"
-//               value={enrollName}
-//               onChange={(e) => setEnrollName(e.target.value)}
-//             />
-//             <button
-//               className="btn"
-//               style={{ width: "auto", marginTop: 0, padding: "12px 20px" }}
-//               onClick={captureAndEnroll}
-//               disabled={!enrollName.trim() || enrolling}
-//             >
-//               {enrolling ? "…" : "📸 Capture & Enroll"}
-//             </button>
-//           </div>
-//
-//           <p className="live-tip">
-//             Tip: click <b>Capture & Enroll</b> 3–5 times with different angles/expressions for a stronger average embedding.
-//           </p>
-//
-//           {lastCapture && (
-//             <div className="live-capture-preview">
-//               <img src={lastCapture} alt="captured" />
-//               <span>Captured frame sent to /enroll</span>
-//             </div>
-//           )}
-//
-//           {enrollMsg && (
-//             <p className={enrollMsg.startsWith("✓") ? "msg-ok" : "error"}>
-//               {enrollMsg}
-//             </p>
-//           )}
-//         </>
-//       )}
-//
-//       {error && <p className="error">{error}</p>}
-//     </div>
-//   );
-// }
+
 
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
 
-/* ─── types ─────────────────────────────────────────────── */
 type VerifyResult = {
   match: string | null;
   best_candidate?: string;
@@ -249,17 +15,12 @@ type VerifyResult = {
 type Box = { x: number; y: number; w: number; h: number };
 type Quality = { size: number; center: number; score: number };
 
-/* ─── helpers ───────────────────────────────────────────── */
-const STABLE_MS = 1000;      // auto-fire after 1s of good quality
-const GOOD_QUALITY = 0.65;   // threshold for "ready"
+const STABLE_MS = 1000;
+const GOOD_QUALITY = 0.65;
 
 function qualityFrom(box: Box, vw: number, vh: number): Quality {
   const areaRatio = (box.w * box.h) / (vw * vh);
-  // size: ideal is ~10-40% of frame area
-  const sizeScore = Math.max(
-    0,
-    Math.min(1, 1 - Math.abs(areaRatio - 0.20) / 0.25)
-  );
+  const sizeScore = Math.max(0, Math.min(1, 1 - Math.abs(areaRatio - 0.20) / 0.25));
   const cx = box.x + box.w / 2;
   const cy = box.y + box.h / 2;
   const dx = Math.abs(cx - vw / 2) / (vw / 2);
@@ -278,37 +39,37 @@ function haptic(ms = 40) {
   }
 }
 
-/* ─── component ─────────────────────────────────────────── */
 export default function LiveVerify() {
-  const videoRef   = useRef<HTMLVideoElement>(null);
-  const canvasRef  = useRef<HTMLCanvasElement>(null);
-  const streamRef  = useRef<MediaStream | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
   const detectorRef = useRef<any>(null);
-  const rafRef     = useRef<number | null>(null);
+  const rafRef = useRef<number | null>(null);
   const verifyTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const inFlightVerify = useRef(false);
   const stableSinceRef = useRef<number | null>(null);
   const captureLockRef = useRef(false);
 
-  const [active, setActive]     = useState(false);
+  const [aspect, setAspect] = useState<number | string>(4 / 3); // NEW: Dynamic aspect ratio
+
+  const [active, setActive] = useState(false);
   const [starting, setStarting] = useState(false);
-  const [warming, setWarming]   = useState(false);
-  const [mirror, setMirror]     = useState(true);
-  const [facing, setFacing]     = useState<"user" | "environment">("user");
-  const [result, setResult]     = useState<VerifyResult | null>(null);
+  const [warming, setWarming] = useState(false);
+  const [mirror, setMirror] = useState(true);
+  const [facing, setFacing] = useState<"user" | "environment">("user");
+  const [result, setResult] = useState<VerifyResult | null>(null);
   const [lastVerify, setLastVerify] = useState(0);
-  const [error, setError]       = useState<string | null>(null);
-  const [box, setBox]           = useState<Box | null>(null);
-  const [quality, setQuality]   = useState<Quality | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [box, setBox] = useState<Box | null>(null);
+  const [quality, setQuality] = useState<Quality | null>(null);
   const [stableMs, setStableMs] = useState(0);
   const [autoMode, setAutoMode] = useState(false);
-  const [flash, setFlash]       = useState(false);
+  const [flash, setFlash] = useState(false);
   const [enrollName, setEnrollName] = useState("");
   const [enrolling, setEnrolling] = useState(false);
   const [enrollMsg, setEnrollMsg] = useState<string | null>(null);
   const [enrolledCount, setEnrolledCount] = useState(0);
 
-  /* ── start / stop camera ─────────────────────────────── */
   const start = useCallback(async () => {
     setError(null);
     setResult(null);
@@ -318,48 +79,40 @@ export default function LiveVerify() {
         streamRef.current.getTracks().forEach((t) => t.stop());
       }
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: facing,
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-        },
+        video: { facingMode: facing, width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false,
       });
       streamRef.current = stream;
+
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
+        // NEW: Set aspect ratio dynamically based on camera feed
+        videoRef.current.onloadedmetadata = () => {
+          if (videoRef.current) {
+            setAspect(videoRef.current.videoWidth / videoRef.current.videoHeight);
+          }
+        };
         await videoRef.current.play();
       }
       setActive(true);
     } catch (e: any) {
-      setError(
-        e?.name === "NotAllowedError"
-          ? "Camera permission denied. Allow camera access and try again."
-          : "Camera error: " + (e?.message || e)
-      );
+      setError(e?.name === "NotAllowedError" ? "Camera permission denied." : "Camera error: " + (e?.message || e));
       setStarting(false);
       return;
     }
     setStarting(false);
 
-    /* warm backend */
     setWarming(true);
     try { await fetch(`${API}/health`); } catch {}
     setWarming(false);
 
-    /* load detector lazily */
     try {
       if (!detectorRef.current) {
-        const { FaceDetector, FilesetResolver } = await import(
-          "@mediapipe/tasks-vision"
-        );
-        const vision = await FilesetResolver.forVisionTasks(
-          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm"
-        );
+        const { FaceDetector, FilesetResolver } = await import("@mediapipe/tasks-vision");
+        const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.12/wasm");
         detectorRef.current = await FaceDetector.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath:
-              "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite",
             delegate: "GPU",
           },
           runningMode: "VIDEO",
@@ -368,10 +121,8 @@ export default function LiveVerify() {
       }
     } catch (e: any) {
       console.warn("MediaPipe load failed:", e);
-      /* detection overlay will just be hidden — rest still works */
     }
 
-    /* start loops */
     startDetectionLoop();
     verifyTimerRef.current = setInterval(captureAndVerify, 1400);
   }, [facing]);
@@ -396,7 +147,6 @@ export default function LiveVerify() {
     stableSinceRef.current = null;
   }, []);
 
-  /* ── detection loop (runs at native FPS) ─────────────── */
   function startDetectionLoop() {
     const tick = () => {
       const video = videoRef.current;
@@ -415,21 +165,12 @@ export default function LiveVerify() {
           const q = qualityFrom(b, vw, vh);
           setQuality(q);
 
-          /* stability timer */
           if (q.score >= GOOD_QUALITY) {
-            if (stableSinceRef.current == null) {
-              stableSinceRef.current = performance.now();
-            }
+            if (stableSinceRef.current == null) stableSinceRef.current = performance.now();
             const elapsed = performance.now() - stableSinceRef.current;
             setStableMs(elapsed);
 
-            /* auto-fire */
-            if (
-              autoMode &&
-              elapsed >= STABLE_MS &&
-              !captureLockRef.current &&
-              enrollName.trim()
-            ) {
+            if (autoMode && elapsed >= STABLE_MS && !captureLockRef.current && enrollName.trim()) {
               captureLockRef.current = true;
               haptic(60);
               captureAndEnroll().finally(() => {
@@ -452,7 +193,6 @@ export default function LiveVerify() {
     rafRef.current = requestAnimationFrame(tick);
   }
 
-  /* ── capture helpers ─────────────────────────────────── */
   function grabFrame(): Promise<Blob | null> {
     return new Promise((resolve) => {
       const video = videoRef.current, canvas = canvasRef.current;
@@ -508,42 +248,23 @@ export default function LiveVerify() {
     }
   }
 
-  /* ── camera switch ───────────────────────────────────── */
   function flipCamera() {
     setFacing((f) => (f === "user" ? "environment" : "user"));
     setTimeout(() => { stop(); start(); }, 50);
   }
 
-  /* ── lifecycle ───────────────────────────────────────── */
-  useEffect(() => {
-    return () => stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  useEffect(() => { return () => stop(); }, [stop]);
 
-  /* ── derived UI state ────────────────────────────────── */
   const matched = !!result?.match && Date.now() - lastVerify < 2500;
   const ready = (quality?.score ?? 0) >= GOOD_QUALITY;
   const stableProgress = Math.min(1, stableMs / STABLE_MS);
-  const guidance = !box
-    ? "Show your face to the camera"
-    : !ready
-    ? quality && quality.size < 0.4
-      ? "Move closer"
-      : quality && quality.center < 0.4
-      ? "Center your face"
-      : "Find better lighting"
-    : autoMode
-    ? "Hold still…"
-    : "Perfect — capture now";
+  const guidance = !box ? "Show your face to the camera" : !ready ? (quality && quality.size < 0.4 ? "Move closer" : quality && quality.center < 0.4 ? "Center your face" : "Find better lighting") : autoMode ? "Hold still…" : "Perfect — capture now";
 
-  /* ── box position (mirror-aware) ─────────────────────── */
   const vw = videoRef.current?.videoWidth ?? 1;
   const vh = videoRef.current?.videoHeight ?? 1;
   const boxStyle: React.CSSProperties | null = box
     ? {
-        left: mirror && facing === "user"
-          ? `${(1 - (box.x + box.w) / vw) * 100}%`
-          : `${(box.x / vw) * 100}%`,
+        left: mirror && facing === "user" ? `${(1 - (box.x + box.w) / vw) * 100}%` : `${(box.x / vw) * 100}%`,
         top: `${(box.y / vh) * 100}%`,
         width: `${(box.w / vw) * 100}%`,
         height: `${(box.h / vh) * 100}%`,
@@ -552,153 +273,67 @@ export default function LiveVerify() {
 
   return (
     <div className="live-wrap">
-      {/* ── viewport ─────────────────────────────────────── */}
-      <div className={`live-frame ${matched ? "ok" : box ? (ready ? "ready" : "") : ""}`}>
-        <video
-          ref={videoRef}
-          className="live-video"
-          playsInline
-          muted
-          style={{ transform: mirror && facing === "user" ? "scaleX(-1)" : "none" }}
-        />
+      <div className={`live-frame ${matched ? "ok" : box ? (ready ? "ready" : "") : ""}`} style={{ aspectRatio: aspect }}>
+        <video ref={videoRef} className="live-video" playsInline muted style={{ transform: mirror && facing === "user" ? "scaleX(-1)" : "none" }} />
         <canvas ref={canvasRef} style={{ display: "none" }} />
 
-        {/* face bounding box */}
         {boxStyle && ready && (
           <div className="live-box ready" style={boxStyle}>
-            <span className="corner tl" />
-            <span className="corner tr" />
-            <span className="corner bl" />
-            <span className="corner br" />
+            <span className="corner tl" /><span className="corner tr" /><span className="corner bl" /><span className="corner br" />
           </div>
         )}
-        {boxStyle && !ready && (
-          <div className="live-box" style={boxStyle} />
-        )}
+        {boxStyle && !ready && <div className="live-box" style={boxStyle} />}
 
-        {/* guidance banner */}
         {active && (
           <div className={`live-guide ${matched ? "ok" : ready ? "ready" : "wait"}`}>
             {matched ? `✓ ${result?.match}` : guidance}
-            {matched && result && (
-              <span className="score">{result.score.toFixed(3)}</span>
-            )}
+            {matched && result && <span className="score">{result.score.toFixed(3)}</span>}
           </div>
         )}
 
-        {/* stable progress ring */}
         {active && autoMode && box && ready && !matched && (
           <div className="live-progress">
             <svg viewBox="0 0 36 36" width="56" height="56">
               <circle cx="18" cy="18" r="15" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="3" />
-              <circle
-                cx="18" cy="18" r="15" fill="none"
-                stroke="#10b981" strokeWidth="3" strokeLinecap="round"
-                strokeDasharray={`${stableProgress * 94.2} 94.2`}
-                transform="rotate(-90 18 18)"
-              />
+              <circle cx="18" cy="18" r="15" fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeDasharray={`${stableProgress * 94.2} 94.2`} transform="rotate(-90 18 18)" />
             </svg>
           </div>
         )}
 
-        {/* capture flash */}
         {flash && <div className="live-flash" />}
-
-        {/* warm badge */}
         {warming && <div className="live-badge warm">Warming up backend…</div>}
+        {!active && <div className="live-placeholder">{starting ? "Requesting camera…" : "Camera is off"}</div>}
 
-        {/* placeholder */}
-        {!active && (
-          <div className="live-placeholder">
-            {starting ? "Requesting camera…" : "Camera is off"}
-          </div>
-        )}
-
-        {/* floating controls top-right */}
         {active && (
           <div className="live-top-controls">
-            <button
-              className="icon-btn"
-              onClick={flipCamera}
-              title="Switch camera"
-              aria-label="Switch camera"
-            >
-              🔄
-            </button>
-            <button
-              className={`icon-btn ${mirror ? "on" : ""}`}
-              onClick={() => setMirror((m) => !m)}
-              title="Mirror"
-              aria-label="Toggle mirror"
-            >
-              🪞
-            </button>
+            <button className="icon-btn" onClick={flipCamera} title="Switch camera">🔄</button>
+            <button className={`icon-btn ${mirror ? "on" : ""}`} onClick={() => setMirror((m) => !m)} title="Mirror">🪞</button>
           </div>
         )}
       </div>
 
-      {/* ── controls below ──────────────────────────────── */}
       {!active ? (
-        <button className="btn" onClick={start} disabled={starting}>
-          {starting ? "Starting…" : "▶ Start camera"}
-        </button>
+        <button className="btn" onClick={start} disabled={starting}>{starting ? "Starting…" : "▶ Start camera"}</button>
       ) : (
         <>
           <div className="live-enroll-row">
-            <input
-              className="field"
-              placeholder="Name to enroll"
-              value={enrollName}
-              onChange={(e) => { setEnrollName(e.target.value); setEnrolledCount(0); }}
-              autoComplete="off"
-            />
-            <button
-              className="btn btn-capture"
-              onClick={captureAndEnroll}
-              disabled={!enrollName.trim() || enrolling || !ready}
-            >
-              {enrolling ? "…" : "📸 Capture"}
-            </button>
+            <input className="field" placeholder="Name to enroll" value={enrollName} onChange={(e) => { setEnrollName(e.target.value); setEnrolledCount(0); }} autoComplete="off" />
+            <button className="btn btn-capture" onClick={captureAndEnroll} disabled={!enrollName.trim() || enrolling || !ready}>{enrolling ? "…" : "📸 Capture"}</button>
           </div>
-
           <div className="live-options">
-            <label className="toggle">
-              <input
-                type="checkbox"
-                checked={autoMode}
-                onChange={(e) => setAutoMode(e.target.checked)}
-              />
-              <span>Auto-capture when face is stable</span>
-            </label>
+            <label className="toggle"><input type="checkbox" checked={autoMode} onChange={(e) => setAutoMode(e.target.checked)} /><span>Auto-capture when face is stable</span></label>
             <button className="btn btn-secondary" onClick={stop}>■ Stop</button>
           </div>
-
-          {/* quality meter */}
           {quality && (
             <div className="live-quality">
-              <div className="q-row">
-                <span>Size</span>
-                <div className="q-bar"><div style={{ width: `${quality.size * 100}%` }} /></div>
-              </div>
-              <div className="q-row">
-                <span>Center</span>
-                <div className="q-bar"><div style={{ width: `${quality.center * 100}%` }} /></div>
-              </div>
-              <div className="q-row">
-                <span>Ready</span>
-                <div className="q-bar"><div className={ready ? "good" : ""} style={{ width: `${quality.score * 100}%` }} /></div>
-              </div>
+              <div className="q-row"><span>Size</span><div className="q-bar"><div style={{ width: `${quality.size * 100}%` }} /></div></div>
+              <div className="q-row"><span>Center</span><div className="q-bar"><div style={{ width: `${quality.center * 100}%` }} /></div></div>
+              <div className="q-row"><span>Ready</span><div className="q-bar"><div className={ready ? "good" : ""} style={{ width: `${quality.score * 100}%` }} /></div></div>
             </div>
           )}
-
-          {enrollMsg && (
-            <p className={enrollMsg.startsWith("✓") ? "msg-ok" : "error"}>
-              {enrollMsg}
-            </p>
-          )}
+          {enrollMsg && <p className={enrollMsg.startsWith("✓") ? "msg-ok" : "error"}>{enrollMsg}</p>}
         </>
       )}
-
       {error && <p className="error">{error}</p>}
     </div>
   );
