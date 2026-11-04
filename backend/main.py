@@ -24,8 +24,8 @@ app = FastAPI(title="Face Recog Ablation API", version="0.1.0")
 # allow Vercel + local dev. Update `allow_origins` after you know your Vercel URL.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://face-recognition-ablation-system-g2z6s3wbf-bajwa52.vercel.app",
-    "http://localhost:3000"],
+    allow_origins=["*"],
+allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
