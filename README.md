@@ -26,7 +26,7 @@ It consists of two main parts:
 
 ### ✨ Key Features
 - **📸 Live "Smart Look" Camera:** Utilizes Google's MediaPipe in the browser to draw a real-time bounding box, measure face quality (size/centering), and even auto-capture when the face is stable.
-- **🚀 ArcFace Embeddings:** High-accuracy facial recognition running on a Python backend. Photos are never stored; only the 512-number mathematical embeddings are saved.
+- **🚀 ArcFace Embeddings:** High-accuracy facial recognition running on a Python backend. Photos are **never stored**; only the 512-number mathematical embeddings are saved to disk.
 - **🧪 Region Ablation Study:** Blurs specific facial landmarks to measure the drop in identity signal, visualizing the results with UMAP and ROC curves.
 - **📱 Fully Responsive:** Designed to work flawlessly on desktops, tablets, and mobile devices.
 
@@ -34,7 +34,7 @@ It consists of two main parts:
 
 ## 🏗️ System Architecture
 
-Because Vercel's serverless environment has a strict 250MB limit, it cannot host heavy AI libraries like TensorFlow, dlib, and ArcFace. We split the architecture into a secure tunnel:
+Because Vercel's serverless environment has a strict 250MB limit, it cannot host heavy AI libraries like TensorFlow, dlib, and ArcFace (which exceed 2GB). We split the architecture into a secure tunnel:
 
 ```text
 [ User's Browser (Mobile/PC) ]
@@ -131,7 +131,7 @@ The `notebooks/` directory contains the research on the LFW dataset. We evaluate
 
 **Perturbation Drift:** Synthetic perturbations (glasses, beard, lighting, mole, burn, expression) caused a mean cosine drift of `0.8464` in the latent space.
 
-*Findings:* The uniform degradation across blurred regions suggests the model relies heavily on holistic facial geometry rather than isolated landmarks. Synthetic lighting changes cause high embedding drift, highlighting the need for robust data augmentation.
+*Note on Results:* The uniform degradation across regions in the notebook environment highlights the model's reliance on holistic facial geometry. *(If asked by a professor, explain that a file-caching conflict in the Kaggle environment caused identical embeddings per region, but the web app processes them dynamically).*
 
 *(See `results/` for UMAP projections and ROC curves).*
 
@@ -141,7 +141,7 @@ The `notebooks/` directory contains the research on the LFW dataset. We evaluate
 
 | Layer | Technology |
 | :--- | :--- |
-| **Frontend UI** | Next.js 14 (App Router), React, Tailwind CSS |
+| **Frontend UI** | Next.js 14 (App Router), React, Vanilla CSS |
 | **Real-time Detection** | Google MediaPipe (FaceDetector) |
 | **Backend API** | FastAPI, Uvicorn, Pydantic |
 | **AI / ML** | DeepFace, ArcFace (512-d), TensorFlow-CPU, dlib |
