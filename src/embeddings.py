@@ -10,7 +10,7 @@ def _represent(image_input) -> np.ndarray | None:
             img_path=image_input,
             model_name=CONFIG["model_name"],
             detector_backend=CONFIG["detector_backend"],
-            enforce_detection=True,
+            enforce_detection=False,
         )
         return np.asarray(result[0]["embedding"], dtype=np.float32)
     except Exception:
