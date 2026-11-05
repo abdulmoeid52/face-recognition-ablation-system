@@ -1,5 +1,5 @@
 model_name: ArcFace
-detector_backend: opencv
+detector_backend: retinaface
 threshold: 0.40          # ← replace with output of scripts/tune_threshold.py
 max_upload_mb: 8
 
